@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>هوية بيتك - إدارة الطلبات</title>
-    <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -41,6 +40,8 @@
             .no-print { display: none !important; }
             body { background: white; }
             .invoice-a4 { width: 100%; margin: 0; padding: 10mm; border: none; }
+            /* إرجاع قسم الفاتورة للشاشة أثناء الطباعة */
+            #capture-area { position: relative !important; left: 0 !important; top: 0 !important; width: 100% !important; }
         }
 
         #capture-area { position: absolute; left: -9999px; top: 0; width: 210mm; }
@@ -51,7 +52,6 @@
 <body>
     <div id="app" class="min-h-screen flex">
         
-        <!-- Sidebar -->
         <aside class="sidebar w-64 text-white flex flex-col no-print fixed h-full z-50 shadow-2xl">
             <div class="p-8 text-center border-b border-white/5">
                 <div class="w-24 h-24 bg-white rounded-3xl mx-auto mb-4 flex items-center justify-center p-2 shadow-xl overflow-hidden">
@@ -77,7 +77,6 @@
             </nav>
         </aside>
 
-        <!-- Main Content -->
         <main class="flex-1 mr-64 p-8 no-print relative min-h-screen">
             
             <div v-if="notification" class="fixed top-10 left-10 z-[100] p-5 rounded-2xl shadow-2xl bg-white border-l-8 flex items-center gap-4 animate-bounce" :class="notification.type === 'error' ? 'border-red-500 text-red-600' : 'border-green-500 text-green-600'">
@@ -108,7 +107,6 @@
                 </div>
             </header>
 
-            <!-- 1. Form Section -->
             <section v-if="activeTab === 'create'" class="bg-white p-8 rounded-3xl shadow-sm border animate-in">
                 <form @submit.prevent="saveOrder" class="space-y-8">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-gray-50 p-8 rounded-3xl">
@@ -193,7 +191,6 @@
                 </form>
             </section>
 
-            <!-- 2. Archive Section -->
             <section v-if="activeTab === 'archive'" class="bg-white rounded-3xl shadow-sm border overflow-hidden animate-in">
                 <div class="p-8 bg-gray-50 flex justify-between items-center border-b">
                     <div class="relative w-96">
@@ -234,7 +231,6 @@
                 </div>
             </section>
 
-            <!-- 3. Invoices Section -->
             <section v-if="activeTab === 'invoices'" class="space-y-8 animate-in">
                 <div class="bg-white p-8 rounded-3xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-6">
                     <div class="flex items-center gap-6">
@@ -275,7 +271,6 @@
                 </div>
             </section>
 
-            <!-- 4. Catalog Section -->
             <section v-if="activeTab === 'catalog'" class="bg-white p-8 rounded-3xl border animate-in shadow-sm">
                 <form @submit.prevent="saveCatalogItem" class="flex flex-wrap gap-6 mb-12 p-8 bg-gray-50 rounded-[2.5rem] items-end border border-white">
                     <div class="flex-1 min-w-[280px]">
@@ -302,11 +297,9 @@
             </section>
         </main>
 
-        <!-- Hidden Capture Area for Professional A4 Invoices -->
         <div id="capture-area" dir="rtl">
             <div v-for="invoice in bulkList" :key="invoice.id" :id="'inv-' + invoice.orderId" class="invoice-a4">
                 
-                <!-- Header (matches image_622b5a.png) -->
                 <div class="flex justify-between items-center mb-8 border-b-2 border-gray-100 pb-8">
                     <div class="w-32 h-32 bg-white flex items-center justify-center p-2 rounded-2xl">
                         <img src="logo1.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://i.ibb.co/68vD84D/logo1.png'">
@@ -321,7 +314,6 @@
                     </div>
                 </div>
 
-                <!-- Addresses Section -->
                 <div class="grid grid-cols-2 gap-10 mb-10 text-xs">
                     <div class="inv-info-box space-y-2">
                         <span class="inv-label">مصدرة إلى :</span>
@@ -340,7 +332,6 @@
                     </div>
                 </div>
 
-                <!-- Payment and Shipping Grid -->
                 <div class="grid grid-cols-2 gap-10 border-y py-8 mb-10 text-sm">
                     <div class="space-y-4">
                         <span class="inv-label">تفاصيل الدفع :</span>
@@ -368,7 +359,6 @@
                     </div>
                 </div>
 
-                <!-- Products Table -->
                 <table class="inv-table">
                     <thead>
                         <tr>
@@ -404,7 +394,6 @@
                     </tbody>
                 </table>
 
-                <!-- Summary (matches image_622b5a.png) -->
                 <div class="mt-12 mr-auto w-96 space-y-2 border-t pt-6">
                     <div class="flex justify-between font-bold text-gray-500">
                         <span>مجموع السلة</span>
@@ -420,9 +409,8 @@
                     </div>
                 </div>
 
-                <!-- Footer -->
                 <div class="mt-24 text-center border-t pt-8">
-                    <p class="text-gray-300 font-black italic text-sm tracking-widest mb-4">شكراً لثقتكم بهوية بيتك - نسعد بخدمتكم دائماً</p>
+                    <p class="text-gray-300 font-black italic text-sm mb-4">شكراً لثقتكم بهوية بيتك - نسعد بخدمتكم دائماً</p>
                     <div class="flex justify-center gap-10 text-[10px] font-bold text-gray-400">
                         <p>📞 +966 54 478 2301</p>
                         <p>📧 hwytbytk@gmail.com</p>
@@ -433,7 +421,6 @@
         </div>
     </div>
 
-    <!-- Script Section -->
     <script type="module">
         const { createApp, ref, computed, onMounted, watchEffect, nextTick } = Vue;
 
@@ -572,7 +559,7 @@
                             const p = {
                                 name: row['المنتج'], color: row['اللون'], count: parseInt(row['العدد'] || 1), 
                                 price: parseFloat(row['السعر الفردي'] || 0), nationalAddress: row['العنوان الوطني'],
-                                villaNo: row['رقم الفيلا'], customName: row['الاسم المخصص'], notes: row['ملاحظات']
+                                villaNo: row['رقم الفيلا'], customName: row['الالاسم المخصص'], notes: row['ملاحظات']
                             };
                             grouped[oid].products.push(p);
                             grouped[oid].totalAmount += (p.price * p.count);
