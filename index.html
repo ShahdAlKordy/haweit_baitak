@@ -3,42 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>هوية بيتك - نظام الإدارة الذكي</title>
+    <title>هوية بيتك - إدارة الطلبات</title>
     <!-- Dependencies -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- PDF & ZIP Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet">
     
     <style>
-        body { font-family: 'Tajawal', sans-serif; background-color: #f4f7f9; color: #1e293b; overflow-x: hidden; }
+        body { font-family: 'Tajawal', sans-serif; background-color: #f4f7fa; color: #1e293b; }
         .sidebar { background: #142952; }
         .active-tab { background: rgba(255, 255, 255, 0.1); border-right: 4px solid #fbbf24; }
-        .card { background: white; border-radius: 1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
         
-        /*Invoice Styling to match image_5fd2f7.png */
-        .invoice-container { background: white; padding: 40px; width: 210mm; min-height: 297mm; margin: auto; border: 1px solid #eee; }
-        .inv-header { border-bottom: 2px solid #142952; padding-bottom: 20px; margin-bottom: 30px; }
-        .inv-title { font-size: 32px; font-weight: 900; color: #142952; text-align: center; margin-bottom: 20px; }
-        .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
-        .inv-label { font-weight: bold; color: #142952; border-bottom: 1px solid #eee; margin-bottom: 8px; display: inline-block; }
-        .inv-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-        .inv-table th { background: #f8f9fa; padding: 12px; text-align: right; font-weight: bold; border: 1px solid #eee; }
-        .inv-table td { padding: 12px; border: 1px solid #eee; vertical-align: top; }
-        .inv-summary { margin-right: auto; width: 300px; }
-        .inv-summary div { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; }
-        .inv-total { background: #f8f9fa; font-weight: 900; color: #142952; font-size: 1.2rem; }
+        /* A4 Invoice Styling - Precise Measurements */
+        .invoice-a4 {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto;
+            padding: 15mm;
+            box-sizing: border-box;
+            position: relative;
+            color: #000;
+        }
+
+        .inv-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .inv-table th { background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; text-align: right; font-weight: 900; font-size: 14px; }
+        .inv-table td { border: 1px solid #e2e8f0; padding: 12px; vertical-align: top; font-size: 13px; }
+        
+        .inv-header-line { border-bottom: 2px solid #142952; padding-bottom: 10px; margin-bottom: 20px; }
+        .inv-label { font-weight: 900; color: #142952; border-bottom: 1px solid #cbd5e1; margin-bottom: 5px; display: inline-block; font-size: 14px; }
 
         @media print {
             .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            .invoice-page { page-break-after: always; padding: 0 !important; margin: 0 !important; border: none !important; }
-            body { background: white; }
+            body { background: white; margin: 0; padding: 0; }
+            .invoice-a4 { box-shadow: none; border: none; margin: 0; width: 100%; }
         }
-        .print-only { display: none; }
+
+        /* Hide the generation area from view but keep for capture */
+        #capture-area {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            width: 210mm;
+        }
         
         .loader-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -49,330 +61,334 @@
         
         <!-- Sidebar -->
         <aside class="sidebar w-64 text-white flex flex-col no-print fixed h-full z-50">
-            <div class="p-6 text-center border-b border-white/5">
-                <div class="w-20 h-20 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center p-2 shadow-inner">
-                    <img src="https://i.ibb.co/68vD84D/logo1.png" alt="Logo" class="w-full h-full object-contain">
+            <div class="p-8 text-center border-b border-white/5">
+                <div class="w-24 h-24 bg-white rounded-2xl mx-auto mb-4 flex items-center justify-center p-2 shadow-2xl">
+                    <img src="logo1.png" alt="Logo" class="w-full h-full object-contain" onerror="this.src='https://i.ibb.co/68vD84D/logo1.png'">
                 </div>
                 <h1 class="text-xl font-black">هوية بيتك</h1>
-                <p class="text-blue-300 text-[9px] mt-1 uppercase tracking-widest">لوحة التحكم السحابية</p>
+                <p class="text-blue-300 text-[10px] mt-1 tracking-widest uppercase font-bold">لوحة الإدارة الذكية</p>
             </div>
             
-            <nav class="flex-1 py-6 px-3 space-y-1">
-                <button @click="setTab('create')" :class="{'active-tab': activeTab === 'create'}" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold hover:bg-white/5 text-sm">
-                    <i data-lucide="plus-circle" class="w-4 h-4 text-yellow-400"></i> تسجيل طلب
+            <nav class="flex-1 py-10 px-4 space-y-2 overflow-y-auto">
+                <button @click="setTab('create')" :class="{'active-tab': activeTab === 'create'}" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                    <i data-lucide="plus-circle" class="w-5 h-5 text-yellow-400"></i> تسجيل طلب
                 </button>
-                <button @click="setTab('archive')" :class="{'active-tab': activeTab === 'archive'}" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold hover:bg-white/5 text-sm">
-                    <i data-lucide="database" class="w-4 h-4 text-yellow-400"></i> أرشيف الطلبات
+                <button @click="setTab('archive')" :class="{'active-tab': activeTab === 'archive'}" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                    <i data-lucide="database" class="w-5 h-5 text-yellow-400"></i> أرشيف الطلبات
                 </button>
-                <button @click="setTab('invoices')" :class="{'active-tab': activeTab === 'invoices'}" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold hover:bg-white/5 text-sm">
-                    <i data-lucide="file-text" class="w-4 h-4 text-yellow-400"></i> مركز الفواتير
+                <button @click="setTab('invoices')" :class="{'active-tab': activeTab === 'invoices'}" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                    <i data-lucide="printer" class="w-5 h-5 text-yellow-400"></i> مركز الفواتير
                 </button>
-                <button @click="setTab('catalog')" :class="{'active-tab': activeTab === 'catalog'}" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold hover:bg-white/5 text-sm">
-                    <i data-lucide="package" class="w-4 h-4 text-yellow-400"></i> الكتالوج
+                <button @click="setTab('catalog')" :class="{'active-tab': activeTab === 'catalog'}" class="w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all font-bold hover:bg-white/5">
+                    <i data-lucide="package" class="w-5 h-5 text-yellow-400"></i> المنتجات
                 </button>
             </nav>
-
-            <div class="p-4 bg-black/20 text-[9px] text-center text-blue-300 break-all">
-                <p class="opacity-50">v2.1 - Ready for GitHub</p>
+            <div class="p-4 bg-black/20 text-[10px] text-center text-blue-300 italic">
+                v3.0 Final Release
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 mr-64 p-8 relative no-print min-h-screen">
+        <main class="flex-1 mr-64 p-8 no-print relative min-h-screen">
             
             <!-- Notification -->
-            <div v-if="notification" class="fixed top-6 left-6 z-[100] p-4 rounded-xl shadow-xl flex items-center gap-3 bg-white border-r-4 animate-bounce" :class="notification.type === 'error' ? 'border-red-500' : 'border-green-500'">
-                <i v-if="notification.type === 'success'" data-lucide="check" class="text-green-500"></i>
-                <i v-else data-lucide="alert-circle" class="text-red-500"></i>
-                <span class="font-bold text-sm">{{ notification.msg }}</span>
+            <transition name="fade">
+                <div v-if="notification" class="fixed top-10 left-10 z-[100] p-5 rounded-2xl shadow-2xl bg-white border-l-8 flex items-center gap-4 animate-bounce" :class="notification.type === 'error' ? 'border-red-500 text-red-600' : 'border-green-500 text-green-600'">
+                    <i v-if="notification.type === 'success'" data-lucide="check-circle"></i>
+                    <i v-else data-lucide="alert-circle"></i>
+                    <span class="font-black">{{ notification.msg }}</span>
+                </div>
+            </transition>
+
+            <!-- Loading Overlay -->
+            <div v-if="loading" class="fixed inset-0 bg-white/70 z-40 flex flex-col items-center justify-center backdrop-blur-sm">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-[#142952] mb-4"></div>
+                <p class="font-black text-[#142952]">جاري المزامنة...</p>
             </div>
 
             <!-- Header -->
-            <header class="mb-8 flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <header class="mb-10 flex justify-between items-center">
                 <div>
-                    <h2 class="text-2xl font-black text-[#142952]">
-                        {{ activeTab === 'create' ? (editingOrder ? 'تعديل طلب' : 'تسجيل طلب') : activeTab === 'archive' ? 'الأرشيف' : activeTab === 'invoices' ? 'إصدار الفواتير' : 'المنتجات' }}
+                    <h2 class="text-3xl font-black text-[#142952]">
+                        <span v-if="activeTab === 'create'">{{ editingOrder ? 'تعديل بيانات الطلب' : 'تسجيل طلب جديد' }}</span>
+                        <span v-if="activeTab === 'archive'">أرشيف السجلات</span>
+                        <span v-if="activeTab === 'invoices'">إصدار وتحميل الفواتير</span>
+                        <span v-if="activeTab === 'catalog'">إدارة المنتجات</span>
                     </h2>
+                    <p class="text-gray-400 font-bold">متصل بـ Google Sheets & LocalStorage</p>
                 </div>
                 <div v-if="activeTab === 'archive'" class="flex gap-2">
-                    <button @click="syncFromSheet" class="bg-[#142952] text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2 text-sm shadow-lg hover:bg-blue-800 transition-all">
+                    <button @click="syncFromSheet" class="bg-[#142952] text-white px-6 py-3 rounded-2xl font-black flex items-center gap-2 shadow-lg">
                         <i data-lucide="refresh-cw" :class="{'loader-spin': syncLoading}" class="w-4 h-4"></i>
-                        مزامنة من جوجل شيت
+                        مزامنة السحاب
                     </button>
                 </div>
             </header>
 
-            <!-- Views -->
-            <div class="max-w-6xl mx-auto">
-                
-                <!-- 1. Registration Form -->
-                <section v-if="activeTab === 'create'" class="card p-8 border border-white">
-                    <form @submit.prevent="saveOrder" class="space-y-8">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-gray-50 p-6 rounded-2xl">
-                            <div class="col-span-full font-black text-[#142952] flex items-center gap-2 mb-2 text-sm">
-                                <i data-lucide="user"></i> بيانات العميل الأساسية
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">الاسم الكامل</label>
-                                <input v-model="orderForm.client.name" required class="w-full p-2.5 border rounded-xl shadow-sm outline-none focus:border-blue-500">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">المدينة</label>
-                                <input v-model="orderForm.client.city" required class="w-full p-2.5 border rounded-xl shadow-sm focus:border-blue-500 outline-none">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">رقم الجوال</label>
-                                <input v-model="orderForm.client.phone" required class="w-full p-2.5 border rounded-xl shadow-sm focus:border-blue-500 outline-none" dir="ltr">
-                            </div>
-                            <div class="space-y-1">
-                                <label class="text-[10px] font-black text-gray-400 mr-2 uppercase">العنوان بالتفصيل</label>
-                                <input v-model="orderForm.client.address" required class="w-full p-2.5 border rounded-xl shadow-sm focus:border-blue-500 outline-none">
-                            </div>
+            <!-- 1. Form Section -->
+            <section v-if="activeTab === 'create'" class="bg-white p-8 rounded-3xl shadow-sm border animate-in">
+                <form @submit.prevent="saveOrder" class="space-y-10">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-gray-50 p-8 rounded-[2rem]">
+                        <div class="col-span-full font-black text-[#142952] flex items-center gap-2 mb-2 text-lg">
+                            <i data-lucide="user"></i> بيانات العميل
                         </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-black text-gray-400 mr-2 uppercase">الاسم الكامل</label>
+                            <input v-model="orderForm.client.name" required class="w-full p-3.5 border-2 border-transparent bg-white rounded-2xl shadow-sm focus:border-blue-500 outline-none font-bold">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-black text-gray-400 mr-2 uppercase">المدينة</label>
+                            <input v-model="orderForm.client.city" required class="w-full p-3.5 border-2 border-transparent bg-white rounded-2xl shadow-sm focus:border-blue-500 outline-none font-bold">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-black text-gray-400 mr-2 uppercase">الجوال</label>
+                            <input v-model="orderForm.client.phone" required class="w-full p-3.5 border-2 border-transparent bg-white rounded-2xl shadow-sm focus:border-blue-500 outline-none font-bold" dir="ltr">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[11px] font-black text-gray-400 mr-2 uppercase">العنوان بالتفصيل</label>
+                            <input v-model="orderForm.client.address" required class="w-full p-3.5 border-2 border-transparent bg-white rounded-2xl shadow-sm focus:border-blue-500 outline-none font-bold">
+                        </div>
+                    </div>
 
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center border-b pb-2">
-                                <h3 class="font-black text-[#142952] text-sm">المنتجات المختارة</h3>
-                                <button type="button" @click="addProductRow" class="text-xs font-black text-blue-600 hover:underline">+ منتج آخر</button>
-                            </div>
-                            
-                            <div v-for="(p, index) in orderForm.products" :key="p.id" class="p-5 border rounded-2xl relative bg-white hover:border-blue-200 transition-all group">
-                                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">المنتج</label>
-                                        <select v-model="p.productId" @change="syncProductData(p)" required class="w-full p-2 border rounded-lg text-sm bg-gray-50">
-                                            <option value="">اختر من القائمة...</option>
-                                            <option v-for="item in catalog" :value="item.id">{{ item.name }} ({{ item.price }} SAR)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">اللون</label>
-                                        <select v-model="p.color" class="w-full p-2 border rounded-lg text-sm">
-                                            <option value="silver">سيلفر (فضي)</option>
-                                            <option value="gold">جولد (ذهبي)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">الكمية</label>
-                                        <input v-model.number="p.count" type="number" min="1" class="w-full p-2 border rounded-lg text-sm">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-blue-600 uppercase">العنوان الوطني</label>
-                                        <input v-model="p.nationalAddress" class="w-full p-2 border border-blue-100 rounded-lg text-sm bg-blue-50/30">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">رقم الفيلا</label>
-                                        <input v-model="p.villaNo" class="w-full p-2 border rounded-lg text-sm">
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">الاسم المخصص</label>
-                                        <input v-model="p.customName" class="w-full p-2 border rounded-lg text-sm" placeholder="الاسم على اللوحة">
-                                    </div>
-                                    <div class="lg:col-span-2">
-                                        <label class="block text-[10px] font-black text-gray-400 uppercase">ملاحظات</label>
-                                        <input v-model="p.notes" class="w-full p-2 border rounded-lg text-sm">
-                                    </div>
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center border-b pb-4">
+                            <h3 class="text-xl font-black text-[#142952]">تفاصيل المنتجات</h3>
+                            <button type="button" @click="addProductRow" class="bg-blue-50 text-blue-600 px-6 py-2 rounded-xl font-black text-sm">+ إضافة منتج</button>
+                        </div>
+                        <div v-for="(p, index) in orderForm.products" :key="p.id" class="p-8 border-2 border-gray-50 rounded-[2rem] relative bg-white hover:border-blue-100 transition-all shadow-sm">
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">المنتج</label>
+                                    <select v-model="p.productId" @change="syncProductData(p)" required class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                        <option value="">اختر...</option>
+                                        <option v-for="item in catalog" :value="item.id">{{ item.name }}</option>
+                                    </select>
                                 </div>
-                                <button v-if="orderForm.products.length > 1" @click="removeProductRow(index)" type="button" class="absolute -top-2 -left-2 bg-red-500 text-white p-1 rounded-full shadow-lg">
-                                    <i data-lucide="x" class="w-3 h-3"></i>
-                                </button>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">اللون</label>
+                                    <select v-model="p.color" class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                        <option value="silver">سيلفر (فضي)</option>
+                                        <option value="gold">جولد (ذهبي)</option>
+                                    </select>
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">الكمية</label>
+                                    <input v-model.number="p.count" type="number" min="1" class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-blue-600 uppercase">العنوان الوطني</label>
+                                    <input v-model="p.nationalAddress" class="w-full p-3 border-2 border-blue-50 rounded-xl bg-blue-50/20 font-bold text-sm">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">رقم الفيلا</label>
+                                    <input v-model="p.villaNo" class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">الاسم المطلوب</label>
+                                    <input v-model="p.customName" class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                </div>
+                                <div class="lg:col-span-2 space-y-1">
+                                    <label class="text-[10px] font-black text-gray-400 uppercase">ملاحظات</label>
+                                    <input v-model="p.notes" class="w-full p-3 border rounded-xl bg-gray-50 font-bold text-sm">
+                                </div>
                             </div>
-                        </div>
-
-                        <div class="flex justify-between items-center border-t pt-6">
-                            <div class="text-[#142952]">
-                                <p class="text-[10px] font-bold">إجمالي المبلغ:</p>
-                                <p class="text-2xl font-black text-green-600">{{ calculateTotal() }} SAR</p>
-                            </div>
-                            <div class="flex gap-3">
-                                <button v-if="editingOrder" type="button" @click="cancelEdit" class="bg-gray-100 px-6 py-3 rounded-xl font-bold text-gray-500 text-sm">إلغاء</button>
-                                <button type="submit" class="bg-[#142952] text-white px-10 py-3 rounded-xl font-black shadow-lg hover:scale-105 active:scale-95 transition-all text-sm">
-                                    {{ editingOrder ? 'تحديث الطلب والمزامنة' : 'حفظ الطلب وتسجيله' }}
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                </section>
-
-                <!-- 2. Archive Section -->
-                <section v-if="activeTab === 'archive'" class="card overflow-hidden">
-                    <div class="p-6 border-b bg-gray-50 flex justify-between items-center">
-                        <div class="relative w-80">
-                            <i data-lucide="search" class="absolute right-3 top-2.5 text-gray-400 w-4 h-4"></i>
-                            <input v-model="searchQuery" class="w-full pr-10 pl-4 py-2 bg-white border rounded-full text-sm outline-none shadow-sm" placeholder="ابحث باسم العميل أو رقم الطلب...">
-                        </div>
-                        <p class="text-xs text-gray-400 font-bold">تم العثور على ({{ filteredOrders.length }}) طلب</p>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-right text-xs">
-                            <thead class="bg-[#142952] text-white">
-                                <tr>
-                                    <th class="p-4">رقم الطلب</th>
-                                    <th class="p-4">التاريخ</th>
-                                    <th class="p-4">العميل</th>
-                                    <th class="p-4">العنوان</th>
-                                    <th class="p-4 font-black">المبلغ</th>
-                                    <th class="p-4 text-center">إجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="order in filteredOrders" :key="order.id" class="border-b hover:bg-blue-50/50">
-                                    <td class="p-4 font-mono font-bold text-blue-700">{{ order.orderId }}</td>
-                                    <td class="p-4 text-gray-500">{{ formatDate(order.timestamp) }}</td>
-                                    <td class="p-4 font-black">{{ order.client.name }}</td>
-                                    <td class="p-4 max-w-xs truncate text-gray-400">{{ order.client.address }}</td>
-                                    <td class="p-4 font-black text-green-600">{{ order.totalAmount }} SAR</td>
-                                    <td class="p-4">
-                                        <div class="flex justify-center gap-1">
-                                            <button @click="viewInvoice(order)" class="p-2 bg-blue-50 text-blue-600 rounded-lg shadow-sm hover:bg-blue-600 hover:text-white transition-all"><i data-lucide="printer" class="w-3.5 h-3.5"></i></button>
-                                            <button @click="editOrder(order)" class="p-2 bg-yellow-50 text-yellow-600 rounded-lg shadow-sm hover:bg-yellow-600 hover:text-white transition-all"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-                                            <button @click="deleteOrder(order)" class="p-2 bg-red-50 text-red-500 rounded-lg shadow-sm hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr v-if="filteredOrders.length === 0">
-                                    <td colspan="6" class="p-20 text-center text-gray-300 font-bold italic">لا توجد سجلات حالياً</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <!-- 3. Invoices Section -->
-                <section v-if="activeTab === 'invoices'" class="space-y-6">
-                    <div class="card p-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div class="flex items-center gap-3">
-                            <label class="font-black text-sm text-[#142952]">تاريخ الفواتير:</label>
-                            <input type="date" v-model="filterDate" class="border p-2 rounded-xl bg-gray-50 outline-none text-sm font-bold">
-                        </div>
-                        <div class="flex flex-wrap gap-2">
-                            <button @click="printBulk" class="bg-[#142952] text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 text-xs shadow-md">
-                                <i data-lucide="printer" class="w-4 h-4"></i> طباعة مجمعة
-                            </button>
-                            <button @click="downloadBulkPDF" class="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 text-xs shadow-md">
-                                <i data-lucide="file-text" class="w-4 h-4"></i> PDF مجمع
-                            </button>
-                            <button @click="downloadZIP" class="bg-green-600 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 text-xs shadow-md">
-                                <i data-lucide="archive" class="w-4 h-4"></i> ZIP (فواتير منفصلة)
+                            <button v-if="orderForm.products.length > 1" @click="removeProductRow(index)" type="button" class="absolute -top-3 -left-3 bg-red-500 text-white p-2.5 rounded-full shadow-lg">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
                             </button>
                         </div>
                     </div>
 
-                    <div v-if="filteredByDateOrders.length === 0" class="card py-24 text-center">
-                        <i data-lucide="inbox" class="w-12 h-12 text-gray-200 mx-auto mb-4"></i>
-                        <p class="text-gray-400 font-bold">لا توجد طلبات لهذا اليوم</p>
-                    </div>
-
-                    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <div v-for="order in filteredByDateOrders" :key="order.id" class="card p-6 border-2 border-transparent hover:border-blue-500 cursor-pointer transition-all group" @click="viewInvoice(order)">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-[9px] font-black tracking-widest">{{ order.orderId }}</span>
-                                <span class="text-[9px] text-gray-300 font-bold">{{ formatTime(order.timestamp) }}</span>
-                            </div>
-                            <h4 class="font-black text-[#142952] mb-1">{{ order.client.name }}</h4>
-                            <p class="text-[10px] text-gray-400 line-clamp-1">📍 {{ order.client.address }}</p>
-                            <div class="flex justify-between items-center border-t mt-4 pt-3">
-                                <span class="font-black text-green-600 text-sm">{{ order.totalAmount }} SAR</span>
-                                <span class="text-blue-500 text-[10px] font-bold group-hover:underline">معاينة الفاتورة</span>
-                            </div>
+                    <div class="flex justify-between items-center border-t pt-10">
+                        <div class="font-black text-4xl text-green-600">{{ calculateTotal() }} SAR</div>
+                        <div class="flex gap-4">
+                            <button v-if="editingOrder" type="button" @click="cancelEdit" class="bg-gray-100 px-10 py-5 rounded-2xl font-black text-gray-500">إلغاء</button>
+                            <button type="submit" :disabled="isSaving" class="bg-[#142952] text-white px-16 py-5 rounded-2xl font-black shadow-xl hover:scale-105 active:scale-95 transition-all">
+                                {{ isSaving ? 'جاري الحفظ...' : (editingOrder ? 'تحديث الطلب' : 'تأكيد الطلب') }}
+                            </button>
                         </div>
                     </div>
-                </section>
+                </form>
+            </section>
 
-                <!-- 4. Catalog Section -->
-                <section v-if="activeTab === 'catalog'" class="card p-8">
-                    <form @submit.prevent="saveCatalogItem" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10 p-6 bg-gray-50 rounded-2xl items-end">
+            <!-- 2. Archive Section -->
+            <section v-if="activeTab === 'archive'" class="bg-white rounded-3xl shadow-sm border overflow-hidden">
+                <div class="p-8 bg-gray-50 flex justify-between items-center border-b">
+                    <div class="relative w-96">
+                        <i data-lucide="search" class="absolute right-4 top-3.5 text-gray-400 w-5 h-5"></i>
+                        <input v-model="searchQuery" class="w-full pr-12 pl-6 py-3.5 bg-white border-none rounded-2xl shadow-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold" placeholder="ابحث باسم العميل أو رقم الطلب...">
+                    </div>
+                    <div class="font-black text-gray-400">الإجمالي: {{ filteredOrders.length }} طلب</div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right border-collapse text-sm">
+                        <thead class="bg-[#142952] text-white">
+                            <tr>
+                                <th class="p-6">رقم الطلب</th>
+                                <th class="p-6">التاريخ</th>
+                                <th class="p-6">العميل</th>
+                                <th class="p-6">العنوان بالتفصيل</th>
+                                <th class="p-6">المبلغ</th>
+                                <th class="p-6 text-center">إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="order in filteredOrders" :key="order.id" class="border-b hover:bg-gray-50 transition-all">
+                                <td class="p-6 font-mono font-black text-blue-700">{{ order.orderId }}</td>
+                                <td class="p-6 text-xs text-gray-500 font-bold">{{ formatDate(order.timestamp) }}</td>
+                                <td class="p-6 font-black text-gray-800">{{ order.client.name }}</td>
+                                <td class="p-4 max-w-xs truncate font-bold text-gray-400">{{ order.client.address }}</td>
+                                <td class="p-6 font-black text-green-600">{{ order.totalAmount }} SAR</td>
+                                <td class="p-6">
+                                    <div class="flex justify-center gap-2">
+                                        <button @click="viewInvoice(order)" class="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><i data-lucide="eye" class="w-4 h-4"></i></button>
+                                        <button @click="editOrder(order)" class="p-3 bg-yellow-50 text-yellow-600 rounded-xl hover:bg-yellow-600 hover:text-white transition-all"><i data-lucide="edit" class="w-4 h-4"></i></button>
+                                        <button @click="deleteOrder(order)" class="p-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-600 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- 3. Invoices Section -->
+            <section v-if="activeTab === 'invoices'" class="space-y-8 animate-in">
+                <div class="bg-white p-8 rounded-3xl shadow-sm border flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div class="flex items-center gap-6">
+                        <label class="font-black text-[#142952] text-lg">اختر اليوم:</label>
+                        <input type="date" v-model="filterDate" class="border-2 border-blue-50 p-3 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 bg-gray-50 font-bold shadow-inner">
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button @click="printBulk" class="bg-[#142952] text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl">
+                            <i data-lucide="printer" class="w-5 h-5 text-yellow-400"></i> طباعة مجمعة
+                        </button>
+                        <button @click="downloadBulkPDF" class="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl">
+                            <i data-lucide="file-down" class="w-5 h-5 text-white"></i> PDF مجمع
+                        </button>
+                        <button @click="downloadZIP" class="bg-green-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-2 shadow-xl">
+                            <i data-lucide="archive" class="w-5 h-5 text-white"></i> ZIP (منفصلة)
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="filteredByDateOrders.length === 0" class="py-32 text-center bg-white rounded-3xl border-4 border-dashed border-gray-100">
+                    <i data-lucide="inbox" class="w-20 h-20 text-gray-100 mx-auto mb-6"></i>
+                    <p class="text-gray-400 font-black text-xl">لا توجد طلبات مسجلة في هذا التاريخ</p>
+                </div>
+
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div v-for="order in filteredByDateOrders" :key="order.id" class="bg-white p-8 rounded-3xl border-2 border-transparent hover:border-blue-500 shadow-sm transition-all cursor-pointer group" @click="viewInvoice(order)">
+                        <div class="flex justify-between items-start mb-6">
+                            <span class="bg-blue-50 text-blue-700 px-4 py-1.5 rounded-full text-xs font-black tracking-widest">{{ order.orderId }}</span>
+                            <span class="text-[10px] font-bold text-gray-300">{{ formatTime(order.timestamp) }}</span>
+                        </div>
+                        <h4 class="font-black text-[#142952] text-xl mb-1">{{ order.client.name }}</h4>
+                        <p class="text-xs text-gray-400 line-clamp-1 mb-6">📍 {{ order.client.address }}</p>
+                        <div class="flex justify-between items-center border-t border-dashed border-gray-100 pt-6">
+                            <span class="font-black text-green-600 text-lg">{{ order.totalAmount }} SAR</span>
+                            <span class="text-blue-600 font-black text-sm group-hover:underline">معاينة الفاتورة</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Catalog Section -->
+            <section v-if="activeTab === 'catalog'" class="bg-white p-8 rounded-3xl border animate-in">
+                <form @submit.prevent="saveCatalogItem" class="flex flex-wrap gap-6 mb-12 p-8 bg-gray-50 rounded-[2.5rem] items-end border border-white">
+                    <div class="flex-1 min-w-[280px]">
+                        <label class="block text-xs font-black text-gray-400 mb-2 uppercase">اسم المنتج</label>
+                        <input v-model="catalogForm.name" required class="w-full p-4 bg-white border-none rounded-2xl shadow-inner outline-none font-black text-[#142952]">
+                    </div>
+                    <div class="w-48">
+                        <label class="block text-xs font-black text-gray-400 mb-2 uppercase">السعر (SAR)</label>
+                        <input v-model.number="catalogForm.price" required type="number" class="w-full p-4 bg-white border-none rounded-2xl shadow-inner outline-none font-black text-green-600">
+                    </div>
+                    <button type="submit" class="bg-[#142952] text-white px-10 py-4 rounded-2xl font-black shadow-lg">إضافة للمتجر</button>
+                </form>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div v-for="item in catalog" :key="item.id" class="p-6 bg-white border-2 border-gray-50 rounded-2xl flex justify-between items-center hover:shadow-xl transition-all">
                         <div>
-                            <label class="block text-[10px] font-black text-gray-400 mb-1">اسم المنتج</label>
-                            <input v-model="catalogForm.name" required class="w-full p-2.5 border rounded-xl bg-white shadow-sm outline-none">
+                            <h5 class="font-black text-[#142952] text-lg">{{ item.name }}</h5>
+                            <p class="text-blue-600 font-black">{{ item.price }} SAR</p>
                         </div>
-                        <div>
-                            <label class="block text-[10px] font-black text-gray-400 mb-1">السعر (SAR)</label>
-                            <input v-model.number="catalogForm.price" required type="number" class="w-full p-2.5 border rounded-xl bg-white shadow-sm outline-none">
-                        </div>
-                        <button type="submit" class="bg-[#142952] text-white px-8 py-2.5 rounded-xl font-black h-[46px] shadow-lg">إضافة</button>
-                    </form>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div v-for="item in catalog" :key="item.id" class="p-5 border-2 border-gray-50 rounded-2xl flex justify-between items-center hover:border-blue-100 transition-all">
-                            <div><h5 class="font-black text-[#142952]">{{ item.name }}</h5><p class="text-blue-600 font-bold text-xs">{{ item.price }} ريال سعودي</p></div>
-                            <button @click="deleteCatalogItem(item.id)" class="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                        </div>
+                        <button @click="deleteCatalogItem(item.id)" class="text-red-400 p-4 hover:bg-red-50 rounded-2xl transition-colors">
+                            <i data-lucide="trash-2" class="w-6 h-6"></i>
+                        </button>
                     </div>
-                </section>
-            </div>
+                </div>
+            </section>
         </main>
 
-        <!-- HIDDEN PRINT/PDF AREA (Matches image_5fd2f7.png) -->
-        <div id="print-wrapper" class="print-only" dir="rtl">
-            <div v-for="invoice in bulkList" :key="invoice.id" :id="'invoice-' + invoice.orderId" class="invoice-page invoice-container">
-                
-                <!-- Title -->
-                <div class="inv-title">فاتورة</div>
+        <!-- Hidden Capture Area for PDF Generation -->
+        <div id="capture-area">
+            <div v-for="invoice in bulkList" :key="invoice.id" :id="'inv-' + invoice.orderId" class="invoice-a4" dir="rtl">
+                <!-- Title Section -->
+                <div class="text-center font-black text-5xl mb-12 text-[#142952] uppercase tracking-widest py-4 border-b-2">فاتورة</div>
 
-                <!-- Basic Details -->
-                <div class="inv-header flex justify-between items-start">
-                    <div class="space-y-1 text-xs text-gray-600 font-bold">
+                <!-- Header Meta -->
+                <div class="inv-header-line flex justify-between items-start">
+                    <div class="text-sm font-bold text-gray-600 space-y-1">
                         <p>تاريخ الطلب: {{ formatDateLong(invoice.timestamp) }}</p>
                         <p>{{ formatTime(invoice.timestamp) }}</p>
                     </div>
-                    <div class="text-left space-y-1 text-xs font-bold">
+                    <div class="text-left font-black text-xs space-y-1">
                         <p>رقم الفاتورة #</p>
                         <p>تفاصيل الطلب</p>
-                        <p>رقم الطلب : <span class="font-mono text-sm">{{ invoice.orderId }}</span></p>
+                        <p>رقم الطلب : <span class="font-mono text-base text-blue-700">{{ invoice.orderId }}</span></p>
                         <p>الرقم الضريبي : 310236446600003</p>
                     </div>
                 </div>
 
                 <!-- Addresses Grid -->
-                <div class="inv-grid text-xs">
+                <div class="grid grid-cols-2 gap-12 mb-10 text-xs">
                     <div class="space-y-1">
                         <span class="inv-label">مصدرة إلى :</span>
-                        <p class="font-black text-sm">{{ invoice.client.name }}</p>
-                        <p>السعودية</p>
+                        <p class="font-black text-lg mb-1">{{ invoice.client.name }}</p>
+                        <p>المملكة العربية السعودية</p>
                         <p>{{ invoice.client.city }}</p>
-                        <p>{{ invoice.client.address }}</p>
-                        <p dir="ltr">{{ invoice.client.phone }}</p>
+                        <p class="font-black text-[#142952]">{{ invoice.client.address }}</p>
+                        <p dir="ltr" class="font-black">{{ invoice.client.phone }}</p>
                     </div>
                     <div class="text-left space-y-1">
                         <span class="inv-label">مصدرة من :</span>
-                        <p class="font-black">المتجر الإلكتروني: هوية بيتك</p>
+                        <p class="font-black text-lg mb-1">المتجر الإلكتروني: هوية بيتك</p>
                         <p>السعودية</p>
                         <p>المعيقلية، الديرة، الرياض، RD, SA</p>
                         <p>hwytbytk@gmail.com</p>
-                        <p dir="ltr">+966544782301</p>
+                        <p dir="ltr" class="font-black">+966 54 478 2301</p>
                     </div>
                 </div>
 
-                <!-- Order Details & Shipping -->
-                <div class="inv-grid text-[10px] border-t border-b py-6 mb-8">
-                    <div>
+                <!-- Payment & Shipping Details -->
+                <div class="grid grid-cols-2 gap-12 border-t border-b py-8 mb-10">
+                    <div class="space-y-4">
                         <span class="inv-label">تفاصيل الدفع :</span>
-                        <div class="flex justify-between w-64 mt-2">
-                            <span>المبلغ:</span>
+                        <div class="flex justify-between font-bold">
+                            <span>المبلغ :</span>
                             <span class="font-black">SAR {{ invoice.totalAmount }}</span>
                         </div>
-                        <div class="flex justify-between w-64">
-                            <span>طريقة الدفع:</span>
-                            <span class="font-black">مدى</span>
+                        <div class="flex justify-between font-bold">
+                            <span>طريقة الدفع :</span>
+                            <span class="font-black">مدى / أونلاين</span>
                         </div>
                     </div>
-                    <div class="text-left">
+                    <div class="text-left space-y-4">
                         <span class="inv-label">تفاصيل الشحن :</span>
-                        <div class="flex flex-row-reverse gap-4 mt-2">
-                            <div class="text-left">
-                                <p>بواسطة:</p>
-                                <p>عدد الأيام المتوقعة للشحن:</p>
+                        <div class="flex justify-end gap-10 font-bold">
+                            <div class="text-left space-y-1">
+                                <p>بواسطة :</p>
+                                <p>أيام الشحن المتوقعة :</p>
                             </div>
-                            <div class="text-left font-black">
+                            <div class="text-left space-y-1 font-black">
                                 <p>مندوبنا</p>
-                                <p>( تصنيع وتوصيل وتركيب ( 7 - 12 يوم عمل ) )</p>
+                                <p>(7 - 12 يوم عمل)</p>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Products Table -->
-                <table class="inv-table text-xs">
+                <!-- Table -->
+                <table class="inv-table">
                     <thead>
                         <tr>
                             <th>المنتج</th>
@@ -385,39 +401,48 @@
                         <tr v-for="p in invoice.products" :key="p.id">
                             <td>
                                 <div class="flex gap-4">
-                                    <div class="w-12 h-12 bg-gray-50 border rounded flex items-center justify-center text-[8px] text-gray-300">LOGO</div>
-                                    <div>
-                                        <p class="font-black">{{ p.name }} (فيلا {{ p.villaNo || '-' }})</p>
-                                        <div class="mt-4 text-[9px]">
-                                            <p class="font-bold border-b border-gray-100 mb-1 inline-block">خيارات المنتج</p>
+                                    <div class="w-12 h-12 bg-gray-50 border rounded flex items-center justify-center p-1">
+                                        <img src="logo1.png" class="w-full h-full object-contain opacity-30">
+                                    </div>
+                                    <div class="space-y-2">
+                                        <p class="font-black text-base">{{ p.name }} (فيلا {{ p.villaNo || '-' }})</p>
+                                        <div class="text-[11px] space-y-1">
+                                            <p class="font-black border-b border-gray-100 inline-block text-[#142952] mb-1">خيارات المنتج</p>
                                             <p>أختار اللون: <span class="font-black">{{ p.color === 'silver' ? 'فضي' : 'ذهبي' }}</span></p>
-                                            <p v-if="p.nationalAddress">رمز العنوان الوطني او رقم واتساب: <span class="font-black">{{ p.nationalAddress }}</span></p>
-                                            <p v-if="p.villaNo">رقم الفلة او الباب او الشقة: <span class="font-black">{{ p.villaNo }}</span></p>
-                                            <p v-if="p.customName">الاسم المطلوب كتابته: <span class="font-black">{{ p.customName }}</span></p>
+                                            <p v-if="p.nationalAddress">رمز العنوان الوطني: <span class="font-black">{{ p.nationalAddress }}</span></p>
+                                            <p v-if="p.villaNo">رقم الفلة/الباب: <span class="font-black">{{ p.villaNo }}</span></p>
+                                            <p v-if="p.customName">الاسم المكتوب: <span class="font-black">{{ p.customName }}</span></p>
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="text-center">{{ p.count }}</td>
+                            <td class="text-center font-black text-lg">{{ p.count }}</td>
                             <td class="text-center">SAR {{ p.price }}</td>
-                            <td class="text-left font-black">SAR {{ p.price * p.count }}</td>
+                            <td class="text-left font-black text-lg text-blue-900">SAR {{ p.price * p.count }}</td>
                         </tr>
                     </tbody>
                 </table>
 
-                <!-- Total Summary -->
-                <div class="inv-summary text-xs">
-                    <div><span>مجموع السلة</span><span class="font-black">SAR {{ invoice.totalAmount }}</span></div>
-                    <div><span>تكلفة الشحن</span><span class="font-black text-green-600">مجاناً</span></div>
-                    <div class="inv-total"><span>إجمالي الطلب</span><span>SAR {{ invoice.totalAmount }}</span></div>
+                <!-- Summary -->
+                <div class="mt-12 mr-auto w-80 space-y-3">
+                    <div class="flex justify-between font-bold border-b pb-2">
+                        <span>مجموع السلة</span>
+                        <span class="font-black">SAR {{ invoice.totalAmount }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold border-b pb-2">
+                        <span>تكلفة الشحن</span>
+                        <span class="font-black text-green-600">مجاناً</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#142952] text-white p-4 rounded-xl font-black text-xl">
+                        <span>إجمالي الطلب</span>
+                        <span>SAR {{ invoice.totalAmount }}</span>
+                    </div>
                 </div>
 
-                <!-- Contact Info Footer -->
-                <div class="mt-20 text-center text-xs font-bold border-t pt-6 text-gray-600">
-                    <p>بيانات التواصل</p>
-                    <p>المتجر الإلكتروني: هوية بيتك</p>
-                    <p dir="ltr">+966544782301</p>
-                    <p>hwytbytk@gmail.com</p>
+                <!-- Footer -->
+                <div class="mt-24 text-center text-xs space-y-2 font-black border-t pt-8 text-gray-400 uppercase tracking-widest">
+                    <p>شكراً لثقتكم بهوية بيتك - نسعد بخدمتكم دائماً</p>
+                    <p>المتجر الإلكتروني: هوية بيتك | hwytbytk@gmail.com | +966 54 478 2301</p>
                 </div>
             </div>
         </div>
@@ -427,18 +452,20 @@
     <script type="module">
         const { createApp, ref, computed, onMounted, watchEffect, nextTick } = Vue;
 
+        // --- رابط جوجل شيت الخاص بك ---
         const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeZM6MciXNhOROqhQLrDgG9qoanJShPb_7KajPm7Sb92qI4pPjqpnduUheI6HR9tm3/exec";
 
         createApp({
             setup() {
                 const activeTab = ref('create');
-                const orders = ref(JSON.parse(localStorage.getItem('hwayt_orders_v2') || '[]'));
-                const catalog = ref(JSON.parse(localStorage.getItem('hwayt_catalog_v2') || '[]'));
+                const orders = ref(JSON.parse(localStorage.getItem('hwayt_orders_v3') || '[]'));
+                const catalog = ref(JSON.parse(localStorage.getItem('hwayt_catalog_v3') || '[]'));
+                const loading = ref(false);
+                const syncLoading = ref(false);
                 const notification = ref(null);
                 const searchQuery = ref('');
                 const filterDate = ref(new Date().toISOString().split('T')[0]);
                 const isSaving = ref(false);
-                const syncLoading = ref(false);
                 const bulkList = ref([]);
                 const editingOrder = ref(null);
 
@@ -488,28 +515,27 @@
                     };
 
                     try {
-                        // 1. Local Save (Primary)
+                        // 1. Local Persistence
                         if (editingOrder.value) {
                             const idx = orders.value.findIndex(o => o.orderId === editingOrder.value.orderId);
                             orders.value[idx] = payload;
                         } else {
                             orders.value.unshift(payload);
                         }
-                        localStorage.setItem('hwayt_orders_v2', JSON.stringify(orders.value));
+                        localStorage.setItem('hwayt_orders_v3', JSON.stringify(orders.value));
 
-                        // 2. Google Sheet Sync (Background)
+                        // 2. Remote Sync
                         fetch(GOOGLE_SCRIPT_URL, { 
                             method: 'POST', 
                             mode: 'no-cors', 
-                            headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload) 
                         });
 
-                        showNotify(editingOrder.value ? "تم التحديث محلياً وبنجاح" : `تم الحفظ بنجاح: ${orderId}`);
+                        showNotify(`تم حفظ الطلب بنجاح: ${orderId}`);
                         cancelEdit();
                         setTab('archive');
                     } catch (e) {
-                        showNotify("تم الحفظ محلياً (فشل مزامنة السحاب حالياً)", "error");
+                        showNotify("تم الحفظ محلياً وفشل الرفع السحابي", "error");
                     } finally { isSaving.value = false; }
                 };
 
@@ -533,9 +559,9 @@
                 const deleteOrder = (order) => {
                     if (confirm(`حذف الطلب ${order.orderId} نهائياً؟`)) {
                         orders.value = orders.value.filter(o => o.orderId !== order.orderId);
-                        localStorage.setItem('hwayt_orders_v2', JSON.stringify(orders.value));
+                        localStorage.setItem('hwayt_orders_v3', JSON.stringify(orders.value));
                         fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'delete', orderId: order.orderId }) });
-                        showNotify("تم الحذف من السجل المحلي");
+                        showNotify("تم الحذف من السجل");
                     }
                 };
 
@@ -544,7 +570,6 @@
                     try {
                         const res = await fetch(GOOGLE_SCRIPT_URL);
                         const sheetData = await res.json();
-                        
                         const grouped = {};
                         sheetData.forEach(row => {
                             const oid = row['رقم الطلب'];
@@ -566,72 +591,70 @@
                             grouped[oid].products.push(p);
                             grouped[oid].totalAmount += (p.price * p.count);
                         });
-
-                        const finalData = Object.values(grouped);
-                        orders.value = finalData;
-                        localStorage.setItem('hwayt_orders_v2', JSON.stringify(finalData));
-                        showNotify("تمت المزامنة بنجاح من جوجل شيت");
+                        orders.value = Object.values(grouped);
+                        localStorage.setItem('hwayt_orders_v3', JSON.stringify(orders.value));
+                        showNotify("تم تحديث البيانات من جوجل شيت");
                     } catch (e) {
-                        showNotify("فشل جلب البيانات من السحاب. تأكدي من تفعيل Web App في Apps Script", "error");
+                        showNotify("خطأ في الاتصال بالبيانات السحابية", "error");
                     } finally { syncLoading.value = false; }
                 };
 
                 const saveCatalogItem = () => {
-                    const newItem = { id: Date.now().toString(), ...catalogForm.value };
-                    catalog.value.push(newItem);
-                    localStorage.setItem('hwayt_catalog_v2', JSON.stringify(catalog.value));
+                    catalog.value.push({ id: Date.now().toString(), ...catalogForm.value });
+                    localStorage.setItem('hwayt_catalog_v3', JSON.stringify(catalog.value));
                     catalogForm.value = { name: '', price: '' };
-                    showNotify("تمت إضافة المنتج للكتالوج");
+                    showNotify("تمت إضافة المنتج");
                 };
 
                 const deleteCatalogItem = (id) => {
                     catalog.value = catalog.value.filter(i => i.id !== id);
-                    localStorage.setItem('hwayt_catalog_v2', JSON.stringify(catalog.value));
+                    localStorage.setItem('hwayt_catalog_v3', JSON.stringify(catalog.value));
                 };
 
-                // Printing Logic
+                // --- PDF & ZIP LOGIC ---
+                
+                const generatePDF = async (orderId) => {
+                    const { jsPDF } = window.jspdf;
+                    const element = document.getElementById('inv-' + orderId);
+                    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+                    return pdf;
+                };
+
                 const viewInvoice = (order) => {
                     bulkList.value = [order];
                     nextTick(() => setTimeout(() => window.print(), 500));
                 };
 
-                const printBulk = () => {
-                    if (filteredByDateOrders.value.length === 0) return showNotify("لا توجد فواتير", "error");
-                    bulkList.value = filteredByDateOrders.value;
-                    nextTick(() => setTimeout(() => window.print(), 500));
-                };
-
                 const downloadBulkPDF = async () => {
+                    if (filteredByDateOrders.value.length === 0) return showNotify("لا يوجد فواتير", "error");
                     const { jsPDF } = window.jspdf;
-                    const pdf = new jsPDF('p', 'mm', 'a4');
-                    showNotify("جاري تجهيز الـ PDF المجمع...");
+                    const finalPDF = new jsPDF('p', 'mm', 'a4');
+                    showNotify("جاري إنشاء الملف المجمع...");
                     
                     for (let i = 0; i < filteredByDateOrders.value.length; i++) {
                         const order = filteredByDateOrders.value[i];
                         bulkList.value = [order];
                         await nextTick();
-                        const element = document.getElementById('invoice-' + order.orderId);
-                        const canvas = await html2canvas(element, { scale: 2 });
-                        const imgData = canvas.toDataURL('image/png');
-                        if (i > 0) pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+                        const pdf = await generatePDF(order.orderId);
+                        const img = (await html2canvas(document.getElementById('inv-' + order.orderId), { scale: 2 })).toDataURL('image/png');
+                        if (i > 0) finalPDF.addPage();
+                        finalPDF.addImage(img, 'PNG', 0, 0, 210, 297);
                     }
-                    pdf.save(`هوية_بيتك_يومي_${filterDate.value}.pdf`);
+                    finalPDF.save(`فواتير_هوية_بيتك_${filterDate.value}.pdf`);
                 };
 
                 const downloadZIP = async () => {
+                    if (filteredByDateOrders.value.length === 0) return showNotify("لا يوجد فواتير", "error");
                     const zip = new JSZip();
-                    const { jsPDF } = window.jspdf;
                     showNotify("جاري تجهيز الملف المضغوط...");
 
                     for (const order of filteredByDateOrders.value) {
                         bulkList.value = [order];
                         await nextTick();
-                        const element = document.getElementById('invoice-' + order.orderId);
-                        const canvas = await html2canvas(element, { scale: 2 });
-                        const imgData = canvas.toDataURL('image/png');
-                        const pdf = new jsPDF('p', 'mm', 'a4');
-                        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+                        const pdf = await generatePDF(order.orderId);
                         zip.file(`${order.orderId}.pdf`, pdf.output('blob'));
                     }
                     
@@ -641,6 +664,12 @@
                         link.download = `فواتير_هوية_بيتك_${filterDate.value}.zip`;
                         link.click();
                     });
+                };
+
+                const printBulk = () => {
+                    if (filteredByDateOrders.value.length === 0) return showNotify("لا يوجد فواتير", "error");
+                    bulkList.value = filteredByDateOrders.value;
+                    nextTick(() => setTimeout(() => window.print(), 500));
                 };
 
                 const filteredOrders = computed(() => {
@@ -655,11 +684,15 @@
                 });
 
                 const formatDate = (ts) => ts ? new Date(ts).toLocaleDateString('ar-SA') : '-';
-                const formatDateLong = (ts) => ts ? new Date(ts).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+                const formatDateLong = (ts) => ts ? new Date(ts).toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '-';
                 const formatTime = (ts) => ts ? new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '-';
 
-                onMounted(() => setTimeout(() => lucide.createIcons(), 500));
-                watchEffect(() => setTimeout(() => lucide.createIcons(), 100));
+                onMounted(() => {
+                    setTimeout(() => lucide.createIcons(), 500);
+                });
+                watchEffect(() => {
+                    setTimeout(() => lucide.createIcons(), 100);
+                });
 
                 return {
                     activeTab, orders, catalog, notification, searchQuery, filterDate, isSaving, syncLoading,
@@ -673,4 +706,3 @@
     </script>
 </body>
 </html>
-
