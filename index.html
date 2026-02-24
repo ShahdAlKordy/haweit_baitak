@@ -404,7 +404,9 @@
                             <td>
                                 <div class="flex gap-3">
                                     <div class="w-12 h-12 bg-gray-50 border rounded-lg flex items-center justify-center p-1 shrink-0">
-                                        <img :src="'products/' + p.name + '.png'" class="w-full h-full object-contain rounded-md" onerror="this.src='logo1.png'">
+                                        <img :src="'products/' + p.name + '.webp'" 
+                                             @error="handleImageFallback($event, p.name)"
+                                             class="w-full h-full object-contain rounded-md">
                                     </div>
                                     <div class="space-y-1 flex-1">
                                         <p class="font-black text-sm text-gray-900">{{ p.name }} <span v-if="p.villaNo" class="text-[10px] text-gray-400 font-bold">(فيلا {{ p.villaNo }})</span></p>
@@ -529,6 +531,21 @@
                 const updatePrice = (p) => {
                     if (p.basePrice !== undefined) {
                         p.price = p.color === 'gold' ? p.basePrice + 19 : p.basePrice;
+                    }
+                };
+
+                // التعديل الخاص بالصور لمعالجة الصيغ المختلفة بذكاء
+                const handleImageFallback = (e, productName) => {
+                    const img = e.target;
+                    if (!img.dataset.triedJpg) {
+                        img.dataset.triedJpg = 'true';
+                        img.src = 'products/' + productName + '.jpg';
+                    } else if (!img.dataset.triedPng) {
+                        img.dataset.triedPng = 'true';
+                        img.src = 'products/' + productName + '.png';
+                    } else {
+                        img.onerror = null; // لإيقاف التكرار اللانهائي في حال عدم وجود logo1.png أيضاً
+                        img.src = 'logo1.png';
                     }
                 };
 
@@ -750,7 +767,7 @@
                 return {
                     activeTab, orders, catalog, notification, searchQuery, filterDate, isSaving, syncLoading, loading,
                     orderForm, catalogForm, bulkList, editingOrder,
-                    addProductRow, removeProductRow, syncProductData, updatePrice, saveOrder, deleteOrder, editOrder, cancelEdit,
+                    addProductRow, removeProductRow, syncProductData, updatePrice, handleImageFallback, saveOrder, deleteOrder, editOrder, cancelEdit,
                     saveCatalogItem, deleteCatalogItem, viewInvoice, printBulk, downloadBulkPDF, downloadZIP, syncFromSheet, calculateTotal, calculateSubTotal,
                     filteredOrders, filteredByDateOrders, formatDate, formatDateLong, formatTime, setTab
                 };
